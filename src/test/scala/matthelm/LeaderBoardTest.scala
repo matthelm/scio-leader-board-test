@@ -11,24 +11,23 @@ class LeaderBoardTest extends PipelineSpec {
 
   case class GameActionInfo(user: String, team: String, score: Int, timestamp: Long)
 
-  private val allowedLateness = Duration.standardHours(1)
-  private val teamWindowDuration = Duration.standardMinutes(20)
-  private val baseTime = new Instant(0)
-
   case class TestUser(user: String, team: String)
-  private val redOne = TestUser("scarlet", "red")
-  private val redTwo = TestUser("burgundy", "red")
-  private val blueOne = TestUser("navy", "blue")
-  private val blueTwo = TestUser("sky", "blue")
 
   private def event(user: TestUser,
                     score: Int,
                     baseTimeOffset: Duration): TimestampedValue[GameActionInfo] = {
-    val t = baseTime.plus(baseTimeOffset)
+    val t = (new Instant(0)).plus(baseTimeOffset)
     TimestampedValue.of(GameActionInfo(user.user, user.team, score, t.getMillis), t)
   }
 
   "LeaderBoard.calculateTeamScores" should "work with on time elements" in {
+    val baseTime = new Instant(0)
+
+    val redOne = TestUser("scarlet", "red")
+    val redTwo = TestUser("burgundy", "red")
+    val blueOne = TestUser("navy", "blue")
+    val blueTwo = TestUser("sky", "blue")
+
     val stream = testStreamOf[GameActionInfo]
       .advanceWatermarkTo(baseTime)
       .addElements(
@@ -45,7 +44,7 @@ class LeaderBoardTest extends PipelineSpec {
     runWithContext { sc =>
       val teamScores = sc.testStream(stream)
         .withFixedWindows(
-          teamWindowDuration,
+          Duration.standardMinutes(20),
           options = WindowOptions(
             trigger = AfterWatermark
               .pastEndOfWindow()
@@ -57,13 +56,13 @@ class LeaderBoardTest extends PipelineSpec {
                 .pastFirstElementInPane()
                 .plusDelayOf(Duration.standardMinutes(10))),
             accumulationMode = ACCUMULATING_FIRED_PANES,
-            allowedLateness = allowedLateness
+            allowedLateness = Duration.standardHours(1)
           )
         )
         .map(i => (i.team, i.score))
         .sumByKey
 
-      val window = new IntervalWindow(baseTime, teamWindowDuration)
+      val window = new IntervalWindow(baseTime, Duration.standardMinutes(20))
       teamScores should inOnTimePane(window) {
         containInAnyOrder(Seq((blueOne.team, 12), (redOne.team, 4)))
       }
