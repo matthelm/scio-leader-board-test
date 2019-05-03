@@ -9,24 +9,24 @@ import org.joda.time.{Duration, Instant}
 
 class LeaderBoardTest extends PipelineSpec {
 
-  case class GameActionInfo(user: String, team: String, score: Int, timestamp: Long)
-
-  case class TestUser(user: String, team: String)
-
-  private def event(user: TestUser,
-                    score: Int,
-                    baseTimeOffset: Duration): TimestampedValue[GameActionInfo] = {
-    val t = (new Instant(0)).plus(baseTimeOffset)
-    TimestampedValue.of(GameActionInfo(user.user, user.team, score, t.getMillis), t)
-  }
-
   "LeaderBoard.calculateTeamScores" should "work with on time elements" in {
+    case class GameActionInfo(user: String, team: String, score: Int, timestamp: Long)
+
+    case class TestUser(user: String, team: String)
+
     val baseTime = new Instant(0)
 
     val redOne = TestUser("scarlet", "red")
     val redTwo = TestUser("burgundy", "red")
     val blueOne = TestUser("navy", "blue")
     val blueTwo = TestUser("sky", "blue")
+
+    def event(user: TestUser,
+                      score: Int,
+                      baseTimeOffset: Duration): TimestampedValue[GameActionInfo] = {
+      val t = (new Instant(0)).plus(baseTimeOffset)
+      TimestampedValue.of(GameActionInfo(user.user, user.team, score, t.getMillis), t)
+    }
 
     val stream = testStreamOf[GameActionInfo]
       .advanceWatermarkTo(baseTime)
